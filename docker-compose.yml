@@ -1,0 +1,32 @@
+services:
+  api:
+    build:
+      context: .
+      target: dev
+    ports: ["3000:3000"]
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+      mail:
+        condition: service_started
+    command: npm run start:dev
+    volumes: [".:/app", "/app/node_modules"]
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ishamela
+      POSTGRES_PASSWORD: ishamela
+      POSTGRES_DB: ishamela
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ishamela -d ishamela"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+  mail:
+    image: axllent/mailpit
+    ports: ["8025:8025", "1025:1025"]
+volumes:
+  pgdata: {}
