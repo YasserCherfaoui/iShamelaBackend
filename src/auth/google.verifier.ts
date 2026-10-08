@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OAuth2Client } from 'google-auth-library';
 
 import { ApiException, tokenInvalid } from '../common/api.exception';
@@ -7,6 +7,7 @@ import type { VerifiedIdentity } from './apple.verifier';
 
 @Injectable()
 export class GoogleTokenVerifier {
+  private readonly logger = new Logger(GoogleTokenVerifier.name);
   private readonly client = new OAuth2Client();
 
   constructor(@Inject(ENV) private readonly env: Env) {}
@@ -28,6 +29,8 @@ export class GoogleTokenVerifier {
       return { sub: payload.sub, email };
     } catch (error) {
       if (error instanceof ApiException) throw error;
+      const detail = error instanceof Error ? error.message : 'unknown';
+      this.logger.warn(`Google ID token rejected: ${detail}`);
       throw tokenInvalid('Google ID token is invalid');
     }
   }
