@@ -191,49 +191,18 @@ export class AuthService {
     device: z.infer<typeof DeviceSchema>;
     appleRefreshToken?: string | null;
   }): Promise<AuthResult> {
-    const email = input.email?.trim().toLowerCase() || null;
     return this.db.transaction(async (tx) => {
       const db = tx as unknown as Database;
-      const existing = await db
-        .select()
-        .from(authIdentities)
-        .where(and(eq(authIdentities.provider, input.provider), eq(authIdentities.subject, input.subject)))
-        .limit(1);
-
-      let userId: string;
-      let isNewUser = false;
-
-      if (existing[0]) {
-        userId = existing[0].userId;
-        if (input.appleRefreshToken) {
-          await db
-            .update(authIdentities)
-            .set({ appleRefreshToken: input.appleRefreshToken, emailAtLink: email ?? existing[0].emailAtLink })
-            .where(eq(authIdentities.id, existing[0].id));
-        }
-      } else {
-        const linked = email ? await this.findUserByEmail(db, email) : undefined;
-        if (linked) {
-          userId = linked;
-        } else {
-          userId = randomUUID();
-          isNewUser = true;
-          await db.insert(users).values({
-            id: userId,
-            email,
-            displayName: null,
-            createdAt: new Date(),
-          });
-        }
-        await db.insert(authIdentities).values({
-          id: randomUUID(),
-          userId,
-          provider: input.provider,
-          subject: input.subject,
-          emailAtLink: email,
-          appleRefreshToken: input.appleRefreshToken ?? null,
-          createdAt: new Date(),
-        });
+      const linked = await this.linkIdentityOn(db, input);
+      const userId = linked.userId;
+      const isNewUser = linked.isNewUser;
+      if (input.appleRefreshToken && !isNewUser) {
+        await db
+          .update(authIdentities)
+          .set({ appleRefreshToken: input.appleRefreshToken })
+          .where(
+            and(eq(authIdentities.provider, input.provider), eq(authIdentities.subject, input.subject)),
+          );
       }
 
       const deviceId = await this.upsertDevice(db, userId, input.device);
@@ -252,6 +221,59 @@ export class AuthService {
         isNewUser,
       };
     });
+  }
+
+  /** SPEC-032. Finds or creates the Postgres user for a provider subject. */
+  async linkIdentity(input: {
+    provider: ProviderName;
+    subject: string;
+    email: string | null;
+  }): Promise<string> {
+    const linked = await this.db.transaction(async (tx) =>
+      this.linkIdentityOn(tx as unknown as Database, input),
+    );
+    return linked.userId;
+  }
+
+  private async linkIdentityOn(
+    db: Database,
+    input: {
+      provider: ProviderName;
+      subject: string;
+      email: string | null;
+      appleRefreshToken?: string | null;
+    },
+  ): Promise<{ userId: string; isNewUser: boolean }> {
+    const email = input.email?.trim().toLowerCase() || null;
+    const existing = await db
+      .select()
+      .from(authIdentities)
+      .where(and(eq(authIdentities.provider, input.provider), eq(authIdentities.subject, input.subject)))
+      .limit(1);
+    if (existing[0]) {
+      return { userId: existing[0].userId, isNewUser: false };
+    }
+    const linked = email ? await this.findUserByEmail(db, email) : undefined;
+    const userId = linked ?? randomUUID();
+    const isNewUser = !linked;
+    if (isNewUser) {
+      await db.insert(users).values({
+        id: userId,
+        email,
+        displayName: null,
+        createdAt: new Date(),
+      });
+    }
+    await db.insert(authIdentities).values({
+      id: randomUUID(),
+      userId,
+      provider: input.provider,
+      subject: input.subject,
+      emailAtLink: email,
+      appleRefreshToken: input.appleRefreshToken ?? null,
+      createdAt: new Date(),
+    });
+    return { userId, isNewUser };
   }
 
   private async findUserByEmail(db: Database, email: string): Promise<string | undefined> {

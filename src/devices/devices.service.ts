@@ -1,5 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
+
+import { unauthorized } from '../common/api.exception';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
@@ -17,6 +19,26 @@ export class RegisterDeviceDto extends createZodDto(RegisterDeviceSchema) {}
 @Injectable()
 export class DevicesService {
   constructor(@Inject(DRIZZLE) private readonly db: Database) {}
+
+  /** SPEC-032. Creates the local device row the first time a Firebase session uses it. */
+  async ensure(userId: string, deviceId: string): Promise<void> {
+    const existing = await this.db.select().from(devices).where(eq(devices.id, deviceId)).limit(1);
+    if (existing[0]) {
+      if (existing[0].userId !== userId) {
+        throw unauthorized('Device belongs to another account');
+      }
+      return;
+    }
+    const now = new Date();
+    await this.db.insert(devices).values({
+      id: deviceId,
+      userId,
+      platform: 'unknown',
+      appVersion: '0',
+      lastSeenAt: now,
+      createdAt: now,
+    });
+  }
 
   async register(userId: string, deviceId: string, body: RegisterDeviceDto): Promise<{ id: string }> {
     const now = new Date();

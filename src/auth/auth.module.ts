@@ -4,6 +4,7 @@ import { AppleSigninCredentials } from './apple-credentials';
 import { AppleTokenVerifier } from './apple.verifier';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { FirebaseTokenVerifier } from './firebase.verifier';
 import { GoogleTokenVerifier } from './google.verifier';
 import { APPLE_JWKS, TokenService } from './token.service';
 
@@ -14,6 +15,7 @@ import { APPLE_JWKS, TokenService } from './token.service';
     TokenService,
     AppleTokenVerifier,
     GoogleTokenVerifier,
+    FirebaseTokenVerifier,
     AppleSigninCredentials,
     {
       provide: APPLE_JWKS,
@@ -23,6 +25,14 @@ import { APPLE_JWKS, TokenService } from './token.service';
       },
     },
   ],
-  exports: [TokenService, AppleSigninCredentials, AppleTokenVerifier, GoogleTokenVerifier, APPLE_JWKS],
+  exports: [
+    AuthService,
+    TokenService,
+    FirebaseTokenVerifier,
+    AppleSigninCredentials,
+    AppleTokenVerifier,
+    GoogleTokenVerifier,
+    APPLE_JWKS,
+  ],
 })
 export class AuthModule {}

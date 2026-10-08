@@ -20,6 +20,7 @@ const EnvSchema = z.object({
   MAIL_SMTP_HOST: z.string().min(1).default('localhost'),
   MAIL_SMTP_PORT: z.coerce.number().int().positive().default(1025),
   OTP_TTL_SECONDS: z.coerce.number().int().positive().default(600),
+  FIREBASE_PROJECT_ID: z.string().min(1).default('shamelaonline'),
   CORS_ORIGINS: z.string().min(1),
   PUBLIC_BASE_URL: z.string().url(),
 });
