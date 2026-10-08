@@ -6,3 +6,6 @@ coverage/
 .DS_Store
 firebase-service-account.json
 *-firebase-adminsdk-*.json
+
+# Local Cursor MCP config
+.mcp.json
