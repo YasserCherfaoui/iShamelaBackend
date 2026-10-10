@@ -9,6 +9,7 @@ import { ZodValidationPipe } from 'nestjs-zod';
 import { config as loadDotenv } from 'dotenv';
 
 import { ApiExceptionFilter } from './common/api-exception.filter';
+import { isAllowedCorsOrigin } from './config/cors';
 import { loadEnv, type Env } from './config/env';
 import { runMigrations } from './db/migrate';
 import { AppModule } from './app.module';
@@ -21,8 +22,18 @@ export function configureApp(app: NestExpressApplication, env: Env): void {
   });
   app.useGlobalPipes(new ZodValidationPipe());
   app.useGlobalFilters(new ApiExceptionFilter());
-  app.use(helmet());
-  app.enableCors({ origin: env.corsOrigins });
+  app.use(
+    helmet({
+      // same-origin CORP blocks the web app from reading this API, and the
+      // browser reports that as a failed connection.
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
+  app.enableCors({
+    origin: (origin, callback) => {
+      callback(null, isAllowedCorsOrigin(origin, env.corsOrigins));
+    },
+  });
   app.use(json({ limit: '1mb' }));
   app.use(urlencoded({ extended: true, limit: '1mb' }));
   app.useLogger(app.get(Logger));
